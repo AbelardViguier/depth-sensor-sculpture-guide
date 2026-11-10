@@ -1,0 +1,35 @@
+name: Build free iPhone camera app
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  unsigned-iphone-app:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate the Xcode project
+        working-directory: ios
+        run: |
+          brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+          xcodegen generate --spec project.yml
+      - name: Compile for a physical iPhone without signing
+        working-directory: ios
+        run: |
+          xcodebuild -project SandGuideCamera.xcodeproj \
+            -scheme SandGuideCamera -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+      - name: Package unsigned IPA
+        working-directory: ios
+        run: |
+          mkdir -p output/Payload
+          cp -R build/Build/Products/Release-iphoneos/SandGuideCamera.app output/Payload/
+          cd output
+          zip -qr ../SandGuideCamera-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SandGuideCamera-unsigned
+          path: ios/SandGuideCamera-unsigned.ipa
+          retention-days: 1
